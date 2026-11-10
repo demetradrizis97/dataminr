@@ -258,7 +258,6 @@
   <pre id="response">No request sent.</pre>
 
   <script>
-    // Proactive refresh buffer: refresh 5 minutes before token expiration
     const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
     let cachedToken = null;
@@ -327,7 +326,6 @@
         `Token Status: Active dmaToken cached | Expires: ${expDate} (~${remainingMin} mins remaining)`;
     }
 
-    // POST /auth/v1/token using application/x-www-form-urlencoded
     async function fetchNewToken(force = false) {
       const manual = manualTokenInput.value.trim();
       if (manual && !force) {
@@ -355,6 +353,7 @@
         throw new Error("Enter both Client ID and Client Secret (or provide a Manual Bearer Token).");
       }
 
+      // Explicitly formatted endpoint utilizing the /auth path prefix group
       const tokenUrl = buildUrl(baseUrl, "/auth/v1/token");
       const formBody = new URLSearchParams({
         grant_type: "api_key",
@@ -386,13 +385,11 @@
       }
 
       cachedToken = data.dmaToken;
-      // Default to 4 hours if expire is unexpectedly omitted
       tokenExpireEpochMs = Number(data.expire) || (Date.now() + 4 * 60 * 60 * 1000);
       updateTokenStatusDisplay();
       return cachedToken;
     }
 
-    // Executes an authenticated API call with proactive check + reactive 401 retry
     async function apiRequest(url, options = {}, allowRetry401 = true) {
       const token = await fetchNewToken(false);
       const appName = appNameInput.value.trim();
@@ -410,7 +407,6 @@
         headers
       });
 
-      // Reactive refresh: if 401 and using client credentials, re-authenticate once
       if (
         response.status === 401 &&
         allowRetry401 &&
@@ -438,7 +434,6 @@
       return data;
     }
 
-    // Extracts the alerts array and nextPage link from Dataminr's response payload
     function extractAlertsAndCursor(payload) {
       if (!payload || typeof payload !== "object") {
         return { alerts: [], nextPage: null };
@@ -462,7 +457,6 @@
       return { alerts, nextPage };
     }
 
-    // Maps Dataminr First Alert v1 fields into a clean summary object
     function normalizeV1Alert(alert) {
       const loc = alert.estimatedEventLocation || {};
       return {
@@ -477,7 +471,7 @@
         })),
         estimatedEventLocation: {
           name: loc.name || null,
-          coordinates: Array.isArray(loc.coordinates) ? loc.coordinates : null, // [lat, lng]
+          coordinates: Array.isArray(loc.coordinates) ? loc.coordinates : null,
           probabilityRadius: loc.probabilityRadius ?? null,
           MGRS: loc.MGRS || null
         },
