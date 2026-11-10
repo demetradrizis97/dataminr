@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dataminr First Alert API Client</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+    }
+    body {
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 0 1rem 3rem;
+    }
+    h1, h2 {
+      margin-bottom: 0.4rem;
+    }
+    .note {
+      color: #9da7b3;
+      line-height: 1.5;
+    }
+    .warning {
+      margin: 1rem 0;
+      padding: 0.8rem 1rem;
+      border-left: 4px solid #d29922;
+      background: #161b22;
+      color: #f2cc60;
+      line-height: 1.5;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 640px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: 700;
+    }
+    input, select, textarea, button {
+      box-sizing: border-box;
+      width: 100%;
+      margin-top: 0.35rem;
+      padding: 0.7rem;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #161b22;
+      color: #e6edf3;
+      font: inherit;
+    }
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .btn-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .btn-row button {
+      flex: 1 1 200px;
+      margin-top: 0;
+    }
+    button {
+      margin-top: 1rem;
+      cursor: pointer;
+      border: 0;
+      background: #238636;
+      font-weight: 700;
+    }
+    button:hover {
+      background: #2ea043;
+    }
+    button.secondary {
+      background: #1f6feb;
+    }
+    button.secondary:hover {
+      background: #388bfd;
+    }
+    button.neutral {
+      background: #30363d;
+    }
+    button.neutral:hover {
+      background: #484f58;
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+    #tokenStatus, #status {
+      margin-top: 1rem;
+      padding: 0.85rem;
+      border-radius: 6px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.9rem;
+    }
+    pre {
+      min-height: 220px;
+      overflow: auto;
+      padding: 1rem;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      background: #161b22;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dataminr First Alert API Client</h1>
+  <p class="note">
+    Credentials and tokens are stored strictly in memory for the current browser tab.
+    Nothing is written to localStorage, cookies, or source control.
+  </p>
+
+  <div class="warning">
+    <strong>Security Note:</strong> Never commit your <code>client_id</code>, <code>client_secret</code>, or <code>dmaToken</code> to source control. Enter them only at runtime below.
+  </div>
+
+  <h2>1. Configuration &amp; Authentication</h2>
+  <div class="grid-2">
+    <div>
+      <label for="baseUrl">API Base URL</label>
+      <input
+        id="baseUrl"
+        type="url"
+        value="https://api.dataminr.com"
+        placeholder="https://api.dataminr.com"
+        autocomplete="off"
+      />
+    </div>
+    <div>
+      <label for="appName">X-Application-Name Header (Pre-arranged)</label>
+      <input
+        id="appName"
+        type="text"
+        placeholder="e.g., my-org-firstalert-integration"
+        autocomplete="off"
+      />
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <label for="clientId">Client ID</label>
+      <input
+        id="clientId"
+        type="text"
+        placeholder="Paste Dataminr Client ID"
+        autocomplete="off"
+      />
+    </div>
+    <div>
+      <label for="clientSecret">Client Secret</label>
+      <input
+        id="clientSecret"
+        type="password"
+        placeholder="Paste Dataminr Client Secret"
+        autocomplete="off"
+      />
+    </div>
+  </div>
+
+  <label for="manualToken">Manual Override: Bearer Token (<code>dmaToken</code>) — Optional</label>
+  <input
+    id="manualToken"
+    type="password"
+    placeholder="Leave blank to auto-fetch via Client ID & Secret, or paste an existing dmaToken"
+    autocomplete="off"
+  />
+
+  <div class="btn-row">
+    <button id="authButton" class="neutral" type="button">Fetch / Refresh Token Now</button>
+  </div>
+  <div id="tokenStatus">Token Status: No active token cached.</div>
+
+  <h2>2. First Alert Delivery (<code>GET /firstalert/v1/alerts</code>)</h2>
+  <p class="note">
+    Pulls real-time breaking news alerts from your configured Alert Lists and parses the v1 schema
+    (<code>alertTimestamp</code>, <code>dataminrAlertUrl</code>, <code>listsMatched</code>, <code>estimatedEventLocation</code> object, and <code>publicPost.href</code>).
+  </p>
+
+  <div class="grid-2">
+    <div>
+      <label for="pageSize">Page Size (Optional)</label>
+      <input
+        id="pageSize"
+        type="number"
+        min="1"
+        max="500"
+        placeholder="e.g., 25 (leave blank for server default)"
+      />
+    </div>
+    <div>
+      <label for="maxPages">Max Pages to Auto-Follow (for Multi-Page Pull)</label>
+      <input
+        id="maxPages"
+        type="number"
+        min="1"
+        max="50"
+        value="3"
+      />
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="fetchAlertsButton" class="secondary" type="button">Fetch Alerts (Single Page)</button>
+    <button id="fetchNextPageButton" class="neutral" type="button" disabled>Fetch Next Page (Cursor)</button>
+    <button id="fetchAllPagesButton" class="neutral" type="button">Fetch &amp; Normalize Multi-Page</button>
+  </div>
+
+  <h2>3. General API Request</h2>
+  <div class="grid-2">
+    <div>
+      <label for="method">HTTP Method</label>
+      <select id="method">
+        <option value="GET" selected>GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="PATCH">PATCH</option>
+        <option value="DELETE">DELETE</option>
+      </select>
+    </div>
+    <div>
+      <label for="path">Endpoint Path or Full URL</label>
+      <input
+        id="path"
+        type="text"
+        value="/firstalert/v1/alerts"
+        placeholder="/firstalert/v1/alerts"
+        autocomplete="off"
+      />
+    </div>
+  </div>
+
+  <label for="body">JSON Request Body — POST, PUT, or PATCH only</label>
+  <textarea id="body" spellcheck="false"></textarea>
+
+  <button id="sendButton" type="button">Send Custom Request</button>
+
+  <div id="status">Ready.</div>
+
+  <h2>Response</h2>
+  <pre id="response">No request sent.</pre>
+
+  <script>
+    // Proactive refresh buffer: refresh 5 minutes before token expiration
+    const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+    let cachedToken = null;
+    let tokenExpireEpochMs = 0;
+    let currentNextPageUrl = null;
+
+    const baseUrlInput = document.getElementById("baseUrl");
+    const appNameInput = document.getElementById("appName");
+    const clientIdInput = document.getElementById("clientId");
+    const clientSecretInput = document.getElementById("clientSecret");
+    const manualTokenInput = document.getElementById("manualToken");
+    const authButton = document.getElementById("authButton");
+    const tokenStatusOutput = document.getElementById("tokenStatus");
+
+    const pageSizeInput = document.getElementById("pageSize");
+    const maxPagesInput = document.getElementById("maxPages");
+    const fetchAlertsButton = document.getElementById("fetchAlertsButton");
+    const fetchNextPageButton = document.getElementById("fetchNextPageButton");
+    const fetchAllPagesButton = document.getElementById("fetchAllPagesButton");
+
+    const methodInput = document.getElementById("method");
+    const pathInput = document.getElementById("path");
+    const bodyInput = document.getElementById("body");
+    const sendButton = document.getElementById("sendButton");
+
+    const statusOutput = document.getElementById("status");
+    const responseOutput = document.getElementById("response");
+
+    function getBaseUrl() {
+      return baseUrlInput.value.trim().replace(/\/+$/, "");
+    }
+
+    function buildUrl(baseUrl, pathOrUrl) {
+      const trimmed = pathOrUrl.trim();
+      if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+      }
+      const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+      return `${baseUrl}${normalizedPath}`;
+    }
+
+    function formatResponse(value) {
+      if (typeof value === "string") {
+        try {
+          return JSON.stringify(JSON.parse(value), null, 2);
+        } catch {
+          return value || "(No response body)";
+        }
+      }
+      return JSON.stringify(value, null, 2);
+    }
+
+    function updateTokenStatusDisplay() {
+      const manual = manualTokenInput.value.trim();
+      if (manual) {
+        tokenStatusOutput.textContent = "Token Status: Using manual Bearer token override.";
+        return;
+      }
+      if (!cachedToken) {
+        tokenStatusOutput.textContent = "Token Status: No active token cached.";
+        return;
+      }
+      const expDate = new Date(tokenExpireEpochMs).toISOString();
+      const remainingMin = Math.max(0, Math.round((tokenExpireEpochMs - Date.now()) / 60000));
+      tokenStatusOutput.textContent =
+        `Token Status: Active dmaToken cached | Expires: ${expDate} (~${remainingMin} mins remaining)`;
+    }
+
+    // POST /auth/v1/token using application/x-www-form-urlencoded
+    async function fetchNewToken(force = false) {
+      const manual = manualTokenInput.value.trim();
+      if (manual && !force) {
+        updateTokenStatusDisplay();
+        return manual;
+      }
+
+      if (
+        !force &&
+        cachedToken &&
+        Date.now() + REFRESH_BUFFER_MS < tokenExpireEpochMs
+      ) {
+        updateTokenStatusDisplay();
+        return cachedToken;
+      }
+
+      const baseUrl = getBaseUrl();
+      const clientId = clientIdInput.value.trim();
+      const clientSecret = clientSecretInput.value.trim();
+
+      if (!baseUrl) {
+        throw new Error("Enter the API Base URL.");
+      }
+      if (!clientId || !clientSecret) {
+        throw new Error("Enter both Client ID and Client Secret (or provide a Manual Bearer Token).");
+      }
+
+      const tokenUrl = buildUrl(baseUrl, "/auth/v1/token");
+      const formBody = new URLSearchParams({
+        grant_type: "api_key",
+        client_id: clientId,
+        client_secret: clientSecret
+      });
+
+      const response = await fetch(tokenUrl, {
+        method: "POST",
+        mode: "cors",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Accept": "application/json"
+        },
+        body: formBody.toString()
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
+
+      if (!response.ok || !data?.dmaToken) {
+        const detail = typeof data === "string" ? data : JSON.stringify(data);
+        throw new Error(`Auth failed (${response.status}): ${detail || response.statusText}`);
+      }
+
+      cachedToken = data.dmaToken;
+      // Default to 4 hours if expire is unexpectedly omitted
+      tokenExpireEpochMs = Number(data.expire) || (Date.now() + 4 * 60 * 60 * 1000);
+      updateTokenStatusDisplay();
+      return cachedToken;
+    }
+
+    // Executes an authenticated API call with proactive check + reactive 401 retry
+    async function apiRequest(url, options = {}, allowRetry401 = true) {
+      const token = await fetchNewToken(false);
+      const appName = appNameInput.value.trim();
+
+      const headers = {
+        "Accept": "application/json",
+        "Authorization": `Bearer ${token}`,
+        ...(appName ? { "X-Application-Name": appName } : {}),
+        ...(options.headers || {})
+      };
+
+      const response = await fetch(url, {
+        mode: "cors",
+        ...options,
+        headers
+      });
+
+      // Reactive refresh: if 401 and using client credentials, re-authenticate once
+      if (
+        response.status === 401 &&
+        allowRetry401 &&
+        !manualTokenInput.value.trim() &&
+        clientIdInput.value.trim() &&
+        clientSecretInput.value.trim()
+      ) {
+        await fetchNewToken(true);
+        return apiRequest(url, options, false);
+      }
+
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
+
+      if (!response.ok) {
+        const detail = typeof data === "string" ? data : JSON.stringify(data);
+        throw new Error(`${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`);
+      }
+
+      return data;
+    }
+
+    // Extracts the alerts array and nextPage link from Dataminr's response payload
+    function extractAlertsAndCursor(payload) {
+      if (!payload || typeof payload !== "object") {
+        return { alerts: [], nextPage: null };
+      }
+      const alerts =
+        Array.isArray(payload.alerts) ? payload.alerts :
+        Array.isArray(payload.data?.alerts) ? payload.data.alerts :
+        Array.isArray(payload.data) ? payload.data : [];
+
+      const rawNextPage =
+        payload.nextPage ||
+        payload.data?.nextPage ||
+        payload.pagination?.nextPage ||
+        null;
+
+      const nextPage =
+        typeof rawNextPage === "string" ? rawNextPage :
+        typeof rawNextPage?.href === "string" ? rawNextPage.href :
+        typeof rawNextPage?.url === "string" ? rawNextPage.url : null;
+
+      return { alerts, nextPage };
+    }
+
+    // Maps Dataminr First Alert v1 fields into a clean summary object
+    function normalizeV1Alert(alert) {
+      const loc = alert.estimatedEventLocation || {};
+      return {
+        alertId: alert.alertId || alert.id || null,
+        alertTimestamp: alert.alertTimestamp || null,
+        headline: alert.headline || alert.title || alert.caption || null,
+        dataminrAlertUrl: alert.dataminrAlertUrl || null,
+        listsMatched: (alert.listsMatched || []).map(list => ({
+          id: list.id,
+          name: list.name,
+          topicIds: list.topicIds || []
+        })),
+        estimatedEventLocation: {
+          name: loc.name || null,
+          coordinates: Array.isArray(loc.coordinates) ? loc.coordinates : null, // [lat, lng]
+          probabilityRadius: loc.probabilityRadius ?? null,
+          MGRS: loc.MGRS || null
+        },
+        publicPost: alert.publicPost
+          ? {
+              href: alert.publicPost.href || null,
+              text: alert.publicPost.text || null,
+              media: alert.publicPost.media || []
+            }
+          : null,
+        linkedAlerts: (alert.linkedAlerts || []).map(linked => ({
+          parentAlertId: linked.parentAlertId || null,
+          ...linked
+        }))
+      };
+    }
+
+    function updateNextPageButton(nextPageUrl) {
+      currentNextPageUrl = nextPageUrl || null;
+      fetchNextPageButton.disabled = !currentNextPageUrl;
+      fetchNextPageButton.textContent = currentNextPageUrl
+        ? "Fetch Next Page (Cursor Ready)"
+        : "Fetch Next Page (No More Pages)";
+    }
+
+    authButton.addEventListener("click", async () => {
+      authButton.disabled = true;
+      statusOutput.textContent = "Requesting new dmaToken from /auth/v1/token...";
+      try {
+        await fetchNewToken(true);
+        statusOutput.textContent = "Authentication succeeded. Token cached in memory.";
+      } catch (error) {
+        statusOutput.textContent = `Authentication error: ${error.message}`;
+      } finally {
+        authButton.disabled = false;
+      }
+    });
+
+    fetchAlertsButton.addEventListener("click", async () => {
+      const baseUrl = getBaseUrl();
+      const pageSize = pageSizeInput.value.trim();
+
+      let endpoint = "/firstalert/v1/alerts";
+      if (pageSize) {
+        endpoint += `?pageSize=${encodeURIComponent(pageSize)}`;
+      }
+
+      const url = buildUrl(baseUrl, endpoint);
+      fetchAlertsButton.disabled = true;
+      statusOutput.textContent = `Fetching alerts from ${url} ...`;
+      responseOutput.textContent = "";
+
+      try {
+        const result = await apiRequest(url, { method: "GET" });
+        const { alerts, nextPage } = extractAlertsAndCursor(result);
+        updateNextPageButton(nextPage);
+
+        statusOutput.textContent =
+          `Success. Retrieved ${alerts.length} alert(s). ` +
+          (nextPage ? "Next page cursor available." : "No nextPage link returned.");
+        responseOutput.textContent = formatResponse(result);
+      } catch (error) {
+        statusOutput.textContent = `Alert fetch failed: ${error.message}`;
+      } finally {
+        fetchAlertsButton.disabled = false;
+      }
+    });
+
+    fetchNextPageButton.addEventListener("click", async () => {
+      if (!currentNextPageUrl) return;
+
+      const baseUrl = getBaseUrl();
+      const url = buildUrl(baseUrl, currentNextPageUrl);
+      fetchNextPageButton.disabled = true;
+      statusOutput.textContent = `Following nextPage link: ${url} ...`;
+      responseOutput.textContent = "";
+
+      try {
+        const result = await apiRequest(url, { method: "GET" });
+        const { alerts, nextPage } = extractAlertsAndCursor(result);
+        updateNextPageButton(nextPage);
+
+        statusOutput.textContent =
+          `Success. Retrieved ${alerts.length} alert(s) from nextPage.`;
+        responseOutput.textContent = formatResponse(result);
+      } catch (error) {
+        statusOutput.textContent = `Next page request failed: ${error.message}`;
+        fetchNextPageButton.disabled = !currentNextPageUrl;
+      }
+    });
+
+    fetchAllPagesButton.addEventListener("click", async () => {
+      const baseUrl = getBaseUrl();
+      const pageSize = pageSizeInput.value.trim();
+      const maxPages = Math.max(1, parseInt(maxPagesInput.value, 10) || 1);
+
+      let nextUrl = buildUrl(
+        baseUrl,
+        `/firstalert/v1/alerts${pageSize ? `?pageSize=${encodeURIComponent(pageSize)}` : ""}`
+      );
+
+      fetchAllPagesButton.disabled = true;
+      responseOutput.textContent = "";
+
+      const allRawAlerts = [];
+      let pagesFetched = 0;
+
+      try {
+        while (nextUrl && pagesFetched < maxPages) {
+          pagesFetched += 1;
+          statusOutput.textContent = `Fetching page ${pagesFetched} of up to ${maxPages}...`;
+
+          const result = await apiRequest(nextUrl, { method: "GET" });
+          const { alerts, nextPage } = extractAlertsAndCursor(result);
+          allRawAlerts.push(...alerts);
+
+          nextUrl = nextPage ? buildUrl(baseUrl, nextPage) : null;
+          updateNextPageButton(nextPage);
+
+          if (alerts.length === 0) {
+            break;
+          }
+        }
+
+        const normalizedAlerts = allRawAlerts.map(normalizeV1Alert);
+        const summaryPayload = {
+          pagesFetched,
+          totalAlertsRetrieved: normalizedAlerts.length,
+          nextPageAvailable: Boolean(currentNextPageUrl),
+          nextPageUrl: currentNextPageUrl,
+          normalizedV1Alerts: normalizedAlerts
+        };
+
+        statusOutput.textContent =
+          `Completed. Retrieved and normalized ${normalizedAlerts.length} alert(s) across ${pagesFetched} page(s).`;
+        responseOutput.textContent = formatResponse(summaryPayload);
+      } catch (error) {
+        statusOutput.textContent = `Multi-page alert pull failed: ${error.message}`;
+      } finally {
+        fetchAllPagesButton.disabled = false;
+      }
+    });
+
+    sendButton.addEventListener("click", async () => {
+      const baseUrl = getBaseUrl();
+      const method = methodInput.value;
+      const path = pathInput.value.trim();
+
+      if (!baseUrl) {
+        statusOutput.textContent = "Enter the API Base URL.";
+        return;
+      }
+      if (!path) {
+        statusOutput.textContent = "Enter an endpoint path.";
+        return;
+      }
+
+      let requestBody;
+      if (!["GET", "DELETE"].includes(method)) {
+        const rawBody = bodyInput.value.trim();
+        if (rawBody) {
+          try {
+            requestBody = JSON.stringify(JSON.parse(rawBody));
+          } catch (error) {
+            statusOutput.textContent = `Invalid JSON request body: ${error.message}`;
+            return;
+          }
+        }
+      }
+
+      const url = buildUrl(baseUrl, path);
+      sendButton.disabled = true;
+      statusOutput.textContent = `Sending ${method} ${url} ...`;
+      responseOutput.textContent = "";
+
+      try {
+        const result = await apiRequest(url, {
+          method,
+          headers: requestBody ? { "Content-Type": "application/json" } : {},
+          ...(requestBody ? { body: requestBody } : {})
+        });
+        statusOutput.textContent = "Success.";
+        responseOutput.textContent = formatResponse(result);
+      } catch (error) {
+        statusOutput.textContent = `Request failed: ${error.message}`;
+      } finally {
+        sendButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
