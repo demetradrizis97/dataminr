@@ -118,9 +118,80 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+
+    /* Modal dialog styling */
+    .modal-backdrop {
+      display: flex;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .modal-footer {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .modal-footer button {
+      margin-top: 0;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Secure Runtime Credentials Modal -->
+  <div id="credModal" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">🔑 Secure Credential Entry</div>
+      <p class="note" style="margin-bottom: 1.25rem;">
+        Your keys will be held strictly in active memory. Closing or refreshing the page instantly erases them.
+      </p>
+      
+      <label for="modalClientId">Client ID</label>
+      <input
+        id="modalClientId"
+        type="text"
+        placeholder="Paste Dataminr Client ID"
+        autocomplete="off"
+      />
+
+      <label for="modalClientSecret">Client Secret</label>
+      <input
+        id="modalClientSecret"
+        type="password"
+        placeholder="Paste Dataminr Client Secret"
+        autocomplete="off"
+      />
+
+      <div class="modal-footer">
+        <button id="saveCredsBtn" type="button">Apply Credentials</button>
+      </div>
+    </div>
+  </div>
+
   <h1>Dataminr First Alert API Client</h1>
   <p class="note">
     Credentials and tokens are stored strictly in memory for the current browser tab.
@@ -128,7 +199,7 @@
   </p>
 
   <div class="warning">
-    <strong>Security Note:</strong> Never commit your <code>client_id</code>, <code>client_secret</code>, or <code>dmaToken</code> to source control. Enter them only at runtime below.
+    <strong>Security Shield Active:</strong> Your API credentials have been loaded via runtime memory injection.
   </div>
 
   <h2>1. Configuration &amp; Authentication</h2>
@@ -154,37 +225,9 @@
     </div>
   </div>
 
-  <div class="grid-2">
-    <div>
-      <label for="clientId">Client ID</label>
-      <input
-        id="clientId"
-        type="text"
-        placeholder="Paste Dataminr Client ID"
-        autocomplete="off"
-      />
-    </div>
-    <div>
-      <label for="clientSecret">Client Secret</label>
-      <input
-        id="clientSecret"
-        type="password"
-        placeholder="Paste Dataminr Client Secret"
-        autocomplete="off"
-      />
-    </div>
-  </div>
-
-  <label for="manualToken">Manual Override: Bearer Token (<code>dmaToken</code>) — Optional</label>
-  <input
-    id="manualToken"
-    type="password"
-    placeholder="Leave blank to auto-fetch via Client ID & Secret, or paste an existing dmaToken"
-    autocomplete="off"
-  />
-
   <div class="btn-row">
     <button id="authButton" class="neutral" type="button">Fetch / Refresh Token Now</button>
+    <button id="changeCredsBtn" class="neutral" type="button">Change / View Credentials</button>
   </div>
   <div id="tokenStatus">Token Status: No active token cached.</div>
 
@@ -260,15 +303,21 @@
   <script>
     const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
+    // Secure runtime-only variable storage
+    let inMemoryClientId = "";
+    let inMemoryClientSecret = "";
     let cachedToken = null;
     let tokenExpireEpochMs = 0;
     let currentNextPageUrl = null;
 
+    const credModal = document.getElementById("credModal");
+    const modalClientId = document.getElementById("modalClientId");
+    const modalClientSecret = document.getElementById("modalClientSecret");
+    const saveCredsBtn = document.getElementById("saveCredsBtn");
+    const changeCredsBtn = document.getElementById("changeCredsBtn");
+
     const baseUrlInput = document.getElementById("baseUrl");
     const appNameInput = document.getElementById("appName");
-    const clientIdInput = document.getElementById("clientId");
-    const clientSecretInput = document.getElementById("clientSecret");
-    const manualTokenInput = document.getElementById("manualToken");
     const authButton = document.getElementById("authButton");
     const tokenStatusOutput = document.getElementById("tokenStatus");
 
@@ -285,6 +334,26 @@
 
     const statusOutput = document.getElementById("status");
     const responseOutput = document.getElementById("response");
+
+    // Modal Control Functions
+    function showModal() {
+      modalClientId.value = inMemoryClientId;
+      modalClientSecret.value = inMemoryClientSecret;
+      credModal.style.display = "flex";
+    }
+
+    function hideModal() {
+      credModal.style.display = "none";
+    }
+
+    saveCredsBtn.addEventListener("click", () => {
+      inMemoryClientId = modalClientId.value.trim();
+      inMemoryClientSecret = modalClientSecret.value.trim();
+      hideModal();
+      updateTokenStatusDisplay();
+    });
+
+    changeCredsBtn.addEventListener("click", showModal);
 
     function getBaseUrl() {
       return baseUrlInput.value.trim().replace(/\/+$/, "");
@@ -311,13 +380,12 @@
     }
 
     function updateTokenStatusDisplay() {
-      const manual = manualTokenInput.value.trim();
-      if (manual) {
-        tokenStatusOutput.textContent = "Token Status: Using manual Bearer token override.";
+      if (!inMemoryClientId || !inMemoryClientSecret) {
+        tokenStatusOutput.textContent = "Token Status: Missing credentials. Click 'Change / View Credentials' to add them.";
         return;
       }
       if (!cachedToken) {
-        tokenStatusOutput.textContent = "Token Status: No active token cached.";
+        tokenStatusOutput.textContent = "Token Status: Credentials cached. Ready to fetch token.";
         return;
       }
       const expDate = new Date(tokenExpireEpochMs).toISOString();
@@ -327,12 +395,6 @@
     }
 
     async function fetchNewToken(force = false) {
-      const manual = manualTokenInput.value.trim();
-      if (manual && !force) {
-        updateTokenStatusDisplay();
-        return manual;
-      }
-
       if (
         !force &&
         cachedToken &&
@@ -343,22 +405,19 @@
       }
 
       const baseUrl = getBaseUrl();
-      const clientId = clientIdInput.value.trim();
-      const clientSecret = clientSecretInput.value.trim();
-
       if (!baseUrl) {
         throw new Error("Enter the API Base URL.");
       }
-      if (!clientId || !clientSecret) {
-        throw new Error("Enter both Client ID and Client Secret (or provide a Manual Bearer Token).");
+      if (!inMemoryClientId || !inMemoryClientSecret) {
+        showModal();
+        throw new Error("Please enter your Client ID and Client Secret in the secure pop-up dialog.");
       }
 
-      // Explicitly formatted endpoint utilizing the /auth path prefix group
       const tokenUrl = buildUrl(baseUrl, "/auth/v1/token");
       const formBody = new URLSearchParams({
         grant_type: "api_key",
-        client_id: clientId,
-        client_secret: clientSecret
+        client_id: inMemoryClientId,
+        client_secret: inMemoryClientSecret
       });
 
       const response = await fetch(tokenUrl, {
@@ -410,9 +469,8 @@
       if (
         response.status === 401 &&
         allowRetry401 &&
-        !manualTokenInput.value.trim() &&
-        clientIdInput.value.trim() &&
-        clientSecretInput.value.trim()
+        inMemoryClientId &&
+        inMemoryClientSecret
       ) {
         await fetchNewToken(true);
         return apiRequest(url, options, false);
